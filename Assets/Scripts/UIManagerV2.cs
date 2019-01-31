@@ -153,37 +153,6 @@ public class UIManagerV2 : MonoBehaviour {
         }
     }
 
-    //Only Dropdown method
-    public void OnDropDownChange() //Change color scale based on drop down value
-    {
-        if (myDropdown.value == 0)
-        {
-            //Gray Scale Selected
-            ColorScale = "GrayScale Spectrum";
-        }
-        if (myDropdown.value == 1)
-        {
-            //Red Scale Selected
-            ColorScale = "RedScale Spectrum";
-        }
-        if (myDropdown.value == 2)
-        {
-            //Green Scale Selected
-            ColorScale = "GreenScale Spectrum";
-        }
-        if (myDropdown.value == 3)
-        {
-            //Blue Scale Selected
-            ColorScale = "BlueScale Spectrum";
-        }
-        if (myDropdown.value == 4)
-        {
-            //Random Scale Selected
-            ColorScale = "Random Spectrum";
-        }
-        Debug.Log(myDropdown.value + ": " + ColorScale);
-    }
-
     public void PlatformDataNode_OnUpdatePlatformDataNodeUI(PlatformDataNode pdn)
     {
         //UI is updated when a tile is selected
@@ -197,7 +166,7 @@ public class UIManagerV2 : MonoBehaviour {
         //check if text fields are null before trying to update
         //YRange text doesn't exist in programming scene
         //and HeightSlider doesn't exist in configuration scene
-        if (PlatformSize != null && DeltaSpacing != null)
+        if (PlatformSize != null && DeltaSpacing != null && pcd !=null)
         {
             PlatformSize.text = string.Format("Platform Size: {0}x{1}", pcd.M, pcd.N);
             DeltaSpacing.text = string.Format("Spacing: {0:0.00}f", pcd.deltaSpacing);

@@ -6,7 +6,9 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 
-public class PlatformManager : PlatformGenericSinglton<PlatformManager> {
+
+public class PlatformManager : PlatformGenericSinglton<PlatformManager>
+{
 
     public delegate void PlatformManagerUpdateUI(PlatformConfigurationData pcd);
     public static event PlatformManagerUpdateUI OnPlatformManagerUpdateUI;
@@ -17,22 +19,27 @@ public class PlatformManager : PlatformGenericSinglton<PlatformManager> {
     GameObject[,] platform;
     GameObject currentSelection;
 
+    //stores next positions of platform
+    PlatformDataNode[,] platformData;
+
     public Material myMaterial;
-    public int M;
-    public int N;
 
     public bool Program;
     public bool SimulateTest;
+    public bool ResetSimulation;
 
     public PlatformConfigurationData configurationData;
 
-	// Use this for initialization
-	void Start () {
+    int i = 0, j = 0;
+    // Use this for initialization
+    void Start()
+    {
+        //maybe read file here?
+    }
 
-	}
-	
-	// Update is called once per frame
-	void Update () {
+    // Update is called once per frame
+    void Update()
+    {
         #region Object Selection
         if (Input.GetMouseButtonUp(0))
         {
@@ -77,6 +84,67 @@ public class PlatformManager : PlatformGenericSinglton<PlatformManager> {
             }
             #endregion
         }
+        if (SimulateTest)
+        {
+            if (i < configurationData.M)
+            {
+                if (j < configurationData.N)
+                {
+                    string s = string.Format("{0},{1}", i, j);
+                    Debug.Log(s);
+
+                    platform[i, j].GetComponent<PlatformDataNode>().NextPosition = platformData[i, j].NextPosition;
+                    if (platform[i, j].GetComponent<PlatformDataNode>().NextPosition == 0)
+                    {
+                        platform[i, j].GetComponent<PlatformDataNode>().Simulate = false;
+                    }
+                    else
+                    {
+                        platform[i, j].GetComponent<PlatformDataNode>().Simulate = true;
+                    }
+                    //increment column counter
+                    j++;
+                }
+                if (j == configurationData.N)
+                {
+                    //end of row, last column index
+                    i++;
+                    j = 0;
+                }
+            }
+            else
+            {
+                //Restart indexes and update positions
+                Debug.Log("End of loop, updating positions");
+                ShiftPositions();
+                i = 0;
+                j = 0;
+
+            }
+        }
+    }
+
+    public void ShiftPositions()
+    {
+        //updates program data at end of loops
+        for (int i = 0; i < configurationData.M; i++)
+        {
+            for (int j = 0; j < configurationData.N; j++)
+            {
+                if (i == configurationData.M - 1)
+                {
+                    //last index so first row should be taking next position from last row
+                    platformData[0, j].NextPosition = platform[i, j].GetComponent<PlatformDataNode>().NextPosition;
+                }
+                else
+                {
+                    //every other row pushes to the next row
+                    platformData[i + 1, j].NextPosition = platform[i, j].GetComponent<PlatformDataNode>().NextPosition;
+                }
+            }
+        }
+
+        //gotta change something to the first if statement here
     }
 
     private void OnEnable()
@@ -97,60 +165,65 @@ public class PlatformManager : PlatformGenericSinglton<PlatformManager> {
 
     private void SceneManager_sceneLoaded(Scene arg0, LoadSceneMode arg1)
     {
-        if (platform != null)
+        switch (SceneManager.GetActiveScene().name)
         {
-            switch (SceneManager.GetActiveScene().name)
-            {
-                case "Programming Scene":
-                    //nodes become selectable now
-                    Program = true;
-                    SimulateTest = false;
+            case "Main Menu":
+                //Don't build
+                Program = false;
+                SimulateTest = false;
+                break;
+            case "Simulate Scene":
+                Program = false;
+                SimulateTest = true;
+                //reset i and j to start from beginning again
+                i = 0;
+                j = 0;
+                //read program data before building
+                ReadFile();
+                BuildPlatform();
+                break;
+            case "Configuration Scene":
+                SimulateTest = false;
+                Program = false;
+                if (platform != null)
+                {
                     BuildPlatform();
-                    break;
-                case "Configuration Scene":
-                    //nodes not selectable here
-                    Program = false;
-                    SimulateTest = false;
+                }
+                break;
+            case "Programming Scene":
+                SimulateTest = false;
+                Program = true;
+                if (platform != null)
+                {
                     BuildPlatform();
-                    break;
-                case "Simulate Scene":
-                    Program = false;
-                    SimulateTest = true;
-                    //BuildPlatform();
-                    ReadFile();
-                    break;
-                case "Main Menu":
-                    //go to main menu, but do not built platform
-                    Program = false;
-                    SimulateTest = false;
-                    break;
-            }
+                }
+                break;
+        }
 
-            if (OnPlatformManagerUpdateUI != null)
-            {
-                //Change UI based on scene you're in
-                OnPlatformManagerUpdateUI(configurationData);
-            }
-
+        //check if configuration data exists
+        if (configurationData != null)
+        {
+            //update camera position to center of platform
             if (OnPlatformManagerUpdateCamera != null)
             {
                 //Update Camera, is called only in Programming & Configuration Scene
                 OnPlatformManagerUpdateCamera(configurationData);
             }
-
+            //update UI
+            if (OnPlatformManagerUpdateUI != null)
+            {
+                OnPlatformManagerUpdateUI(configurationData);
+            }
         }
-
     }
 
     public void UIManagerV2_OnBuildPlatformClicked(PlatformConfigurationData pcd)
     {
+        //destroy old game objects
         DestroyPlatform();
 
+        //set new configuration data
         configurationData = pcd;
-
-        //Set new M & N
-        M = pcd.M;
-        N = pcd.N;
 
         //now build
         BuildPlatform();
@@ -158,10 +231,10 @@ public class PlatformManager : PlatformGenericSinglton<PlatformManager> {
 
     public void BuildPlatform()
     {
-        platform = new GameObject[M, N];
-        for(int i = 0; i < M; i++)
+        platform = new GameObject[configurationData.M, configurationData.N];
+        for (int i = 0; i < configurationData.M; i++)
         {
-            for(int j = 0; j < N; j++)
+            for (int j = 0; j < configurationData.N; j++)
             {
                 //Creating cubes
                 GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -177,28 +250,27 @@ public class PlatformManager : PlatformGenericSinglton<PlatformManager> {
                 pdn.NextColor = Color.white;
                 pdn.NextPosition = cube.transform.position.y;
                 pdn.node = cube;
-                
+
                 pdn.i = i;
                 pdn.j = j;
 
                 platform[i, j] = cube;
             }
         }
-
-
     }
 
     public void DestroyPlatform()
     {
-        if (platform != null) {
-            for (int i = 0; i < M; i++)
+        if (platform != null)
+        {
+            for (int i = 0; i < configurationData.M; i++)
             {
-                for (int j = 0; j < N; j++)
+                for (int j = 0; j < configurationData.N; j++)
                 {
                     Destroy(platform[i, j]);
                 }
             }
-        }       
+        }
     }
 
     //Used to determine if UI is over a game object
@@ -215,69 +287,65 @@ public class PlatformManager : PlatformGenericSinglton<PlatformManager> {
         return results.Count > 0;
     }
 
-
+    //write text file 
     public void UIManagerV2_OnWriteProgramData()
     {
         using (StreamWriter outputFile = new StreamWriter(Path.Combine(Application.dataPath, "WriteLines.txt")))
         {
             outputFile.WriteLine(configurationData.ToString());
-            for(int i = 0; i < M; i++)
+            for (int i = 0; i < configurationData.M; i++)
             {
-                for(int j = 0; j < N; j++)
+                for (int j = 0; j < configurationData.N; j++)
                 {
                     outputFile.WriteLine(platform[i, j].GetComponent<PlatformDataNode>().ToString());
                 }
             }
         }
+        Debug.Log("Program has finished writing txt file");
     }
 
+    //read text file
     public void ReadFile()
     {
-        if(platform == null) { 
-            //nothing new built, so read from data
-            Debug.Log("Reader reached");
-            StreamReader reader = new StreamReader(Path.Combine(Application.dataPath, "WriteLines.txt"));
-            //sDebug.Log(reader.ReadToEnd());
+        Debug.Log("Reader reached");
+        StreamReader reader = new StreamReader(Path.Combine(Application.dataPath, "WriteLines.txt"));
 
-            using (reader)
+        using (reader)
+        {
+            //this should be the PCD line (1st line)
+            string line = reader.ReadLine();
+            string[] entries;
+            entries = line.Split(',');
+            //1st line is configuration data
+            Debug.Log(entries[0] + "," + entries[1] + "," + entries[2] + "," + entries[3]);
+            //Configure
+            PlatformConfigurationData pcd = new PlatformConfigurationData();
+            pcd.M = Convert.ToInt32(entries[0]);
+            pcd.N = Convert.ToInt32(entries[1]);
+            pcd.deltaSpacing = (float)Convert.ToDouble(entries[2]);
+            pcd.RandomHeight = (float)Convert.ToDouble(entries[3]);
+            configurationData = pcd;
+            platformData = new PlatformDataNode[pcd.M, pcd.N];
+            while ((line = reader.ReadLine()) != null)
             {
-                //this should be the PCD line (1st line)
-                string line;
-                string[] entries;
-                int i = 0;
-                while((line = reader.ReadLine()) != null)
-                {
-                    //platform[entries[0], entries[1]] = new PND(
-                    entries = line.Split(',');
-                    if (i == 0)
-                    {
-                        //1st line is configuration data
-                        Debug.Log(entries[0] + "," + entries[1] + "," + entries[2]+"," + entries[3]);
-                        //Convert
-                        int M = Convert.ToInt32(entries[0]);
-                        int N = Convert.ToInt32(entries[1]);
-                        float deltaSpacing = (float) Convert.ToDouble(entries[2]);
-                        float RandomHeight = (float) Convert.ToDouble(entries[3]);
-                        //Configure
-                        PlatformConfigurationData pcd = new PlatformConfigurationData();
-                        pcd.M = M;
-                        pcd.N = N;
-                        pcd.deltaSpacing = deltaSpacing;
-                        pcd.RandomHeight = RandomHeight;
-                        configurationData = pcd;
-                        i++;
-                    }
-                    else
-                    {
-                        //rest of lines are now platform data nodes
-                        Debug.Log(entries[0] + "," + entries[1] + "," + entries[2]);
-                    }
-                }
-
+                PlatformDataNode pdn = new PlatformDataNode();
+                entries = line.Split(',');
+                //rest of lines are now platform data nodes
+                Debug.Log(entries[0] + "," + entries[1] + "," + entries[2]);
+                //store the content of the file in array of PDN
+                pdn.i = Convert.ToInt32(entries[0]);
+                pdn.j = Convert.ToInt32(entries[1]);
+                pdn.NextPosition = (float)Convert.ToDouble(entries[2]);
+                platformData[pdn.i, pdn.j] = pdn;
+                //this only holds the data
+                //the tiles need to be updated with the new positions
+                //if we're in the simulate scene
+                //do this somewhere else, not here
             }
-            reader.Close();
-            BuildPlatform();
         }
-        //otherwise do nothing
+        reader.Close();
+
     }
+
+
 }
